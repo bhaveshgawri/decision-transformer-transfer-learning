@@ -15,8 +15,8 @@ drop_out, gamma = 0.1, 0.99
 lr, weight_decay = 0.0001, 0.0001
 
 if runtime_env == 'dev':
-    epochs = 10
-    itr = 45
+    epochs = 4
+    itr = 4
 
 curr_time = int(time.time())
 
@@ -26,6 +26,4 @@ cheetahTransformer = DecisionTransformerUtils(None, cheetah_cfg, max_ep_len, tra
 
 cheetahTransformer.train(epochs, itr, batch_size, grad_clip)
 cheetahTransformer.save_model(env='cheetah', type_='sc', time=curr_time)
-
-
 

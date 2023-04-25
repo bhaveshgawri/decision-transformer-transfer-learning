@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 from transformers import DecisionTransformerModel, DecisionTransformerConfig
 
+import json
 from typing import Any, Dict
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -133,7 +134,7 @@ class DecisionTransformer(DecisionTransformerModel):
 
 class DecisionTransformerUtils:
     def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
-                gamma: float, lr: float, weight_decay: float, warmup_steps: int, load_data: bool,
+                gamma: float, lr: float, weight_decay: float, warmup_steps: int, train: bool,
                 dataset_path: str, dataset_name: str):
         
         if model is not None:
@@ -144,9 +145,9 @@ class DecisionTransformerUtils:
         else:
             raise 'Both model and config can\'t be None!'
         
-        self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-        self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
-        if load_data:
+        if train:
+            self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+            self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
             self.cdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
 
     def train(self, epochs, itr_per_epoch, batch_size, grad_clip):
@@ -174,7 +175,9 @@ class DecisionTransformerUtils:
         type_: ft (for a fine-tuned model) / sc (if trained from scratch)
         time: int(time.time())
         """
-        torch.save(self.model.state_dict(), f'./models/{env}_{type_}_{time}.pt')
+        torch.save(self.model.state_dict(), f'./cache//models/{env}_{type_}_{time}.pt')
+        self.config.to_json_file(f'./cache/configs/{env}_{type_}_{time}.json')
+
         return True
 
     def load_weights(self, file_path):
