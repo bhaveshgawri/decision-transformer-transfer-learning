@@ -9,7 +9,6 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 from transformers import DecisionTransformerModel, DecisionTransformerConfig
 
-import json
 from typing import Any, Dict
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -132,7 +131,7 @@ class DecisionTransformer(DecisionTransformerModel):
         return self.loss(i[m == 1], o[m == 1])
 
 
-class DecisionTransformerUtils:
+class DecisionTransformerRunner:
     def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
                 gamma: float, lr: float, weight_decay: float, warmup_steps: int, train: bool,
                 dataset_path: str, dataset_name: str):
