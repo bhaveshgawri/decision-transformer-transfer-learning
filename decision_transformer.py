@@ -9,13 +9,13 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 from transformers import DecisionTransformerModel, DecisionTransformerConfig
 
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class DecisionTransformerDataLoader(Dataset):
-    def __init__(self, max_ep_len, train_ep_len, gamma, path, name):
+    def __init__(self, max_ep_len: int, train_ep_len: int, gamma: float, path: str, name: str) -> None:
         self.train_ep_len = train_ep_len
         self.max_ep_len = max_ep_len
 
@@ -30,10 +30,10 @@ class DecisionTransformerDataLoader(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, index) -> Dict[str, Any]:
+    def __getitem__(self, index: int) -> Dict[str, Any]:
         return self.data[index]
 
-    def get_batch(self, batch_size=8) -> Dict[str, Any]:
+    def get_batch(self, batch_size: int = 8) -> Dict[str, Any]:
         batch_data_indices = np.random.choice(np.arange(len(self.p)), size=batch_size, p=self.p)
 
         states, actions, returns_to_go, timesteps, attn_masks = [], [], [], [], []
@@ -63,7 +63,7 @@ class DecisionTransformerDataLoader(Dataset):
             "attention_mask": attn_masks.float(),
         }
 
-    def get_state(self, sample, idx):
+    def get_state(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
         state = torch.tensor(sample['observations'][idx: idx + self.train_ep_len], dtype=float, device=DEVICE)
         
         zeros = torch.zeros(self.train_ep_len - state.shape[0], self.state_dim, dtype=float, device=DEVICE)
@@ -71,14 +71,14 @@ class DecisionTransformerDataLoader(Dataset):
         state = state - self.mean / self.std
         return state
 
-    def get_action(self, sample, idx):
+    def get_action(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
         action = torch.tensor(sample['actions'][idx: idx + self.train_ep_len], dtype=float, device=DEVICE)
 
         zeros = torch.zeros(self.train_ep_len - action.shape[0], self.action_dim, dtype=float, device=DEVICE)
         action = torch.cat([zeros, action], dim=0)
         return action
 
-    def get_returns(self, sample, idx):
+    def get_returns(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
         returns = sample['rewards'][idx: idx + self.train_ep_len]
         r = 0
         for i, reward in reversed(list(enumerate(returns))):
@@ -90,14 +90,14 @@ class DecisionTransformerDataLoader(Dataset):
         returns = torch.cat([zeros, returns], dim=0)
         return returns.unsqueeze(1)
 
-    def get_timestep(self, ep_len, idx):
+    def get_timestep(self, ep_len: int, idx: int) -> torch.Tensor:
         time = torch.arange(start=idx, end=min(ep_len, idx + self.train_ep_len), dtype=torch.long, device=DEVICE)
 
         zeros = torch.zeros(self.train_ep_len - time.shape[0], dtype=float, device=DEVICE)
         time = torch.cat([zeros, time], dim=0)
         return time
 
-    def get_mask(self, ep_len, idx):
+    def get_mask(self, ep_len: int, idx: int) -> torch.Tensor:
         one_ct = min(ep_len, idx + self.train_ep_len) - idx
         ones = torch.ones(one_ct, dtype=float, device=DEVICE)
 
@@ -105,7 +105,7 @@ class DecisionTransformerDataLoader(Dataset):
         mask = torch.cat([zeros, ones], dim=0)
         return mask
 
-    def get_obs_stats(self):
+    def get_obs_stats(self) -> Tuple[np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
         obs, ep_len = [], []
         for observation in self.data['observations']:
             obs.extend(observation)
@@ -115,17 +115,17 @@ class DecisionTransformerDataLoader(Dataset):
 
 
 class DecisionTransformer(DecisionTransformerModel):
-    def __init__(self, config):
+    def __init__(self, config: DecisionTransformerConfig) -> None:
         super().__init__(config)
 
         self.action_dim = config.act_dim
         self.loss = torch.nn.MSELoss()
         self.to(DEVICE)
 
-    def forward(self, **x):
+    def forward(self, **x: Dict[str, Any]) -> (Tuple | Any):
         return super().forward(**x)
 
-    def calc_loss(self, inp, out, mask):
+    def calc_loss(self, inp: torch.Tensor, out: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         i = inp.reshape(-1, self.action_dim)
         o = out.reshape(-1, self.action_dim)
         m = mask.reshape(-1)
@@ -135,7 +135,7 @@ class DecisionTransformer(DecisionTransformerModel):
 class DecisionTransformerTrainer:
     def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
                 gamma: float, lr: float, weight_decay: float, warmup_steps: int, train: bool,
-                dataset_path: str, dataset_name: str):
+                dataset_path: str, dataset_name: str) -> None:
         
         if model is not None:
             self.model == model
@@ -150,7 +150,7 @@ class DecisionTransformerTrainer:
         self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
         self.dtdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
 
-    def train(self, epochs, itr_per_epoch, batch_size, grad_clip):
+    def train(self, epochs: int, itr_per_epoch: int, batch_size: int, grad_clip: float) -> None:
         for epoch in range(epochs):
             for itr in range(itr_per_epoch):        
                 x = self.dtdl.get_batch(batch_size=batch_size)
@@ -169,7 +169,7 @@ class DecisionTransformerTrainer:
             print(f'Completed epoch: {epoch + 1}, loss: {loss}')
         print('Training complete.')
 
-    def save_model(self, env, type_, time):
+    def save_model(self, env: str, type_: str, time: int) -> bool:
         """
         env: cheetah / walker / hopper
         type_: ft (for a fine-tuned model) / sc (if trained from scratch)
@@ -185,18 +185,18 @@ class DecisionTransformerTrainer:
         return True
 
 class DecisionTransformerEval:
-    def __init__(self, model, config, train_data_mean, train_data_std):
+    def __init__(self, model, config, train_data_mean, train_data_std) -> None:
         self.model = model
         self.config = config
 
         self.train_data_mean = train_data_mean
         self.train_data_std = train_data_std
 
-    def evaluate(self, epochs, itr_per_epoch, batch_size):
+    def evaluate(self, epochs: int, itr_per_epoch: int, batch_size: int) -> None:
         print(self.config, self.train_data_mean, self.train_data_std)
 
     @staticmethod
-    def load_weights(file_name):
+    def load_weights(file_name: str) -> 'DecisionTransformerEval':
         config = DecisionTransformerConfig().from_json_file(f'./cache/configs/{file_name}.json').to_dict()
         mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
                     torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
