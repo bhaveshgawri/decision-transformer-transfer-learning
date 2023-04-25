@@ -120,6 +120,7 @@ class DecisionTransformer(DecisionTransformerModel):
 
         self.action_dim = config.act_dim
         self.loss = torch.nn.MSELoss()
+        self.to(DEVICE)
 
     def forward(self, **x):
         return super().forward(**x)
@@ -131,7 +132,7 @@ class DecisionTransformer(DecisionTransformerModel):
         return self.loss(i[m == 1], o[m == 1])
 
 
-class DecisionTransformerRunner:
+class DecisionTransformerTrainer:
     def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
                 gamma: float, lr: float, weight_decay: float, warmup_steps: int, train: bool,
                 dataset_path: str, dataset_name: str):
@@ -144,10 +145,10 @@ class DecisionTransformerRunner:
         else:
             raise 'Both model and config can\'t be None!'
         
-        if train:
-            self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-            self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
-            self.cdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
+        self.model.train()
+        self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
+        self.cdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
 
     def train(self, epochs, itr_per_epoch, batch_size, grad_clip):
         for epoch in range(epochs):
@@ -167,19 +168,48 @@ class DecisionTransformerRunner:
 
             print(f'Completed epoch: {epoch + 1}, loss: {loss}')
         print('Training complete.')
-    
+
     def save_model(self, env, type_, time):
         """
         env: cheetah / walker / hopper
         type_: ft (for a fine-tuned model) / sc (if trained from scratch)
         time: int(time.time())
         """
-        torch.save(self.model.state_dict(), f'./cache//models/{env}_{type_}_{time}.pt')
-        self.config.to_json_file(f'./cache/configs/{env}_{type_}_{time}.json')
+        torch.save(self.model.cpu().state_dict(), f'./cache/models/{env}_{type_}_{time}.pt')
+        
+        cfg = self.config.to_dict()
+        mean, std, _ = self.cdl.get_obs_stats()
+        cfg['train_data_mean'], cfg['train_data_std'] = mean.tolist(), std.tolist()
+        DecisionTransformerConfig().from_dict(cfg).to_json_file(f'./cache/configs/{env}_{type_}_{time}.json')
 
         return True
 
-    def load_weights(self, file_path):
-        self.model.load_state_dict(torch.load(file_path))
-        return self.model
+class DecisionTransformerEval:
+    def __init__(self, model, config, train_data_mean, train_data_std):
+        self.model = model
+        self.config = config
 
+        self.train_data_mean = train_data_mean
+        self.train_data_std = train_data_std
+
+    def evaluate(self, epochs, itr_per_epoch, batch_size):
+        print(self.config, self.train_data_mean, self.train_data_std)
+
+    @staticmethod
+    def load_weights(file_name):
+        config = DecisionTransformerConfig().from_json_file(f'./cache/configs/{file_name}.json').to_dict()
+        mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
+                    torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
+
+        config = DecisionTransformerConfig().from_dict(config)
+        model = DecisionTransformer(config)
+        model.load_state_dict(torch.load(f'./cache/models/{file_name}.pt'))
+        dt_eval = DecisionTransformerEval(model, config, mean, std)
+
+        return dt_eval
+        
+        
+
+
+
+        
