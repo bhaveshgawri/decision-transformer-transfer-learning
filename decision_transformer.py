@@ -148,12 +148,12 @@ class DecisionTransformerTrainer:
         self.model.train()
         self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
-        self.cdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
+        self.dtdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
 
     def train(self, epochs, itr_per_epoch, batch_size, grad_clip):
         for epoch in range(epochs):
             for itr in range(itr_per_epoch):        
-                x = self.cdl.get_batch(batch_size=batch_size)
+                x = self.dtdl.get_batch(batch_size=batch_size)
                 y_pred = self.model(**x)
 
                 action_inp, action_out, mask = x['actions'], y_pred[1], x['attention_mask']
@@ -178,7 +178,7 @@ class DecisionTransformerTrainer:
         torch.save(self.model.cpu().state_dict(), f'./cache/models/{env}_{type_}_{time}.pt')
         
         cfg = self.config.to_dict()
-        mean, std, _ = self.cdl.get_obs_stats()
+        mean, std, _ = self.dtdl.get_obs_stats()
         cfg['train_data_mean'], cfg['train_data_std'] = mean.tolist(), std.tolist()
         DecisionTransformerConfig().from_dict(cfg).to_json_file(f'./cache/configs/{env}_{type_}_{time}.json')
 
@@ -207,9 +207,3 @@ class DecisionTransformerEval:
         dt_eval = DecisionTransformerEval(model, config, mean, std)
 
         return dt_eval
-        
-        
-
-
-
-        
