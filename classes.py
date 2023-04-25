@@ -1,20 +1,27 @@
 import numpy as np
+
 import torch
+from torch.optim import AdamW
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import Dataset
+
 from datasets import load_dataset
-from transformers import DecisionTransformerModel
+from transformers import DecisionTransformerModel, DecisionTransformerConfig
+
 from typing import Any, Dict
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class CheetahDataLoader(Dataset):
-    def __init__(self, max_ep_len, train_ep_len, gamma):
+
+class DecisionTransformerDataLoader(Dataset):
+    def __init__(self, max_ep_len, train_ep_len, gamma, path, name):
         self.train_ep_len = train_ep_len
         self.max_ep_len = max_ep_len
 
         self.gamma = gamma
 
-        self.data = load_dataset("edbeeching/decision_transformer_gym_replay", "halfcheetah-expert-v2", split='train')
+        self.data = load_dataset(path, name, split='train')
         self.mean, self.std, self.p = self.get_obs_stats()
 
         self.state_dim = len(self.data[0]['observations'][0])
@@ -107,13 +114,13 @@ class CheetahDataLoader(Dataset):
         return obs.mean(axis=0), obs.std(axis=0) + 1e-6, ep_len / ep_len.sum()
 
 
-class CheetahTransformer(DecisionTransformerModel):
+class DecisionTransformer(DecisionTransformerModel):
     def __init__(self, config):
         super().__init__(config)
 
         self.action_dim = config.act_dim
         self.loss = torch.nn.MSELoss()
-    
+
     def forward(self, **x):
         return super().forward(**x)
 
@@ -123,4 +130,54 @@ class CheetahTransformer(DecisionTransformerModel):
         m = mask.reshape(-1)
         return self.loss(i[m == 1], o[m == 1])
 
+
+class DecisionTransformerUtils:
+    def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
+                gamma: float, lr: float, weight_decay: float, warmup_steps: int, load_data: bool,
+                dataset_path: str, dataset_name: str):
+        
+        if model is not None:
+            self.model == model
+        elif config is not None:
+            self.config = config
+            self.model = DecisionTransformer(self.config)
+        else:
+            raise 'Both model and config can\'t be None!'
+        
+        self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
+        if load_data:
+            self.cdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
+
+    def train(self, epochs, itr_per_epoch, batch_size, grad_clip):
+        for epoch in range(epochs):
+            for itr in range(itr_per_epoch):        
+                x = self.cdl.get_batch(batch_size=batch_size)
+                y_pred = self.model(**x)
+
+                action_inp, action_out, mask = x['actions'], y_pred[1], x['attention_mask']
+                loss = self.model.calc_loss(action_inp, action_out, mask)
+
+                self.optim.zero_grad()
+                loss.backward()
+
+                clip_grad_norm_(self.model.parameters(), grad_clip)
+                self.optim.step()
+                self.sched.step()
+
+            print(f'Completed epoch: {epoch + 1}, loss: {loss}')
+        print('Training complete.')
+    
+    def save_model(self, env, type_, time):
+        """
+        env: cheetah / walker / hopper
+        type_: ft (for a fine-tuned model) / sc (if trained from scratch)
+        time: int(time.time())
+        """
+        torch.save(self.model.state_dict(), f'./models/{env}_{type_}_{time}.pt')
+        return True
+
+    def load_weights(self, file_path):
+        self.model.load_state_dict(torch.load(file_path))
+        return self.model
 
