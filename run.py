@@ -31,7 +31,7 @@ def train():
     cheetahTransformerRunner.save_model(env='cheetah', type_='sc', time=curr_time)
 
 def eval():
-    cheetahEval = DecisionTransformerEvaluator.load_weights('cheetah_sc_1682405786')
+    cheetahEval = DecisionTransformerEvaluator.load_weights('cheetah_sc_1682486789')
     cheetahEval.evaluate('HalfCheetah-v4', test_epochs, test_ep_len, reward_scale, target_reward=5000)
 
 
