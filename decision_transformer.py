@@ -15,11 +15,12 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class DecisionTransformerDataLoader(Dataset):
-    def __init__(self, max_ep_len: int, train_ep_len: int, gamma: float, path: str, name: str) -> None:
+    def __init__(self, max_ep_len: int, train_ep_len: int, gamma: float, path: str, name: str, return_scale: int) -> None:
         self.train_ep_len = train_ep_len
         self.max_ep_len = max_ep_len
 
         self.gamma = gamma
+        self.return_scale = return_scale
 
         self.data = load_dataset(path, name, split='train')
         self.mean, self.std, self.p = self.get_obs_stats()
@@ -87,7 +88,7 @@ class DecisionTransformerDataLoader(Dataset):
         returns = torch.tensor(returns, dtype=float, device=DEVICE)
 
         zeros = torch.zeros(self.train_ep_len - returns.shape[0], dtype=float, device=DEVICE)
-        returns = torch.cat([zeros, returns], dim=0)
+        returns = torch.cat([zeros, returns], dim=0) / self.return_scale
         return returns.unsqueeze(1)
 
     def get_timestep(self, ep_len: int, idx: int) -> torch.Tensor:
@@ -135,7 +136,7 @@ class DecisionTransformer(DecisionTransformerModel):
 class DecisionTransformerTrainer:
     def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
                 gamma: float, lr: float, weight_decay: float, warmup_steps: int, train: bool,
-                dataset_path: str, dataset_name: str) -> None:
+                dataset_path: str, dataset_name: str, return_scale: int) -> None:
         
         if model is not None:
             self.model == model
@@ -148,7 +149,7 @@ class DecisionTransformerTrainer:
         self.model.train()
         self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
-        self.dtdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name)
+        self.dtdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name, return_scale)
 
     def train(self, epochs: int, itr_per_epoch: int, batch_size: int, grad_clip: float) -> None:
         for epoch in range(epochs):
@@ -184,26 +185,3 @@ class DecisionTransformerTrainer:
 
         return True
 
-class DecisionTransformerEval:
-    def __init__(self, model, config, train_data_mean, train_data_std) -> None:
-        self.model = model
-        self.config = config
-
-        self.train_data_mean = train_data_mean
-        self.train_data_std = train_data_std
-
-    def evaluate(self, epochs: int, itr_per_epoch: int, batch_size: int) -> None:
-        print(self.config, self.train_data_mean, self.train_data_std)
-
-    @staticmethod
-    def load_weights(file_name: str) -> 'DecisionTransformerEval':
-        config = DecisionTransformerConfig().from_json_file(f'./cache/configs/{file_name}.json').to_dict()
-        mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
-                    torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
-
-        config = DecisionTransformerConfig().from_dict(config)
-        model = DecisionTransformer(config)
-        model.load_state_dict(torch.load(f'./cache/models/{file_name}.pt'))
-        dt_eval = DecisionTransformerEval(model, config, mean, std)
-
-        return dt_eval

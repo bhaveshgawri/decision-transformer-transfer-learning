@@ -1,0 +1,6 @@
+gymnasium[mujoco]
+transformers
+datasets
+torch
+ipykernel
+pyvirtualdisplay
