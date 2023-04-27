@@ -195,8 +195,8 @@ class DecisionTransformer:
                 remove_unused_columns=False,
                 learning_rate=lr,
                 weight_decay=weight_decay,
-                # warmup_steps=warmup_steps,
-                warmup_ratio=warmup_ratio,
+                warmup_steps=warmup_steps,
+                # warmup_ratio=warmup_ratio,
                 max_grad_norm=self.grad_clip
             )
         else:
