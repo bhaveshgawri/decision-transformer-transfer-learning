@@ -8,7 +8,7 @@ from transformers import DecisionTransformerConfig
 runtime_env='dev'
 runtime_env='prod'
 
-platform = 'hf'
+platform = 'pt'
 
 max_ep_len = 1000
 train_ep_len = test_ep_len = 20 # K
@@ -36,13 +36,14 @@ def eval():
     # cheetahEval = DecisionTransformerEvaluator.load_weights(platform, './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt')
     # cheetahEval.evaluate('HalfCheetah-v4', test_epochs, test_ep_len, './cache/pt/outputs/cheetah_sc_1682575937_1500', reward_scale, target_reward=12000)
 
-    cheetahEval = DecisionTransformerEvaluator.load_weights(platform, './cache/hf/cheetah_sc_1682577402/config.json', './cache/hf/cheetah_sc_1682577402/checkpoint-1600')
-    cheetahEval.evaluate('HalfCheetah-v4', test_epochs, test_ep_len, './cache/hf/cheetah_sc_1682577402/output', reward_scale, target_reward=12000)
+    # cheetahEval = DecisionTransformerEvaluator.load_weights(platform, './cache/hf/cheetah_sc_1682577402/config.json', './cache/hf/cheetah_sc_1682577402/checkpoint-1600')
+    # cheetahEval.evaluate('HalfCheetah-v4', test_epochs, test_ep_len, './cache/hf/cheetah_sc_1682577402/output', reward_scale, target_reward=12000)
     pass
 
 if __name__ == '__main__':
     # train()
-    eval()
+    # eval()
+    pass
 
 
 
