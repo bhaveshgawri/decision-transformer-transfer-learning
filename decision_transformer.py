@@ -8,16 +8,16 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import Dataset, DataLoader
 
 from datasets import load_dataset
-from transformers import DecisionTransformerModel, DecisionTransformerConfig
+from transformers import DecisionTransformerModel, DecisionTransformerConfig, TrainingArguments, Trainer
 
-import time
+import time, csv
 from typing import Any, Dict, Tuple
-
-from DecisionTransformerEvaluator import DecisionTransformerEvaluator
+from dataclasses import dataclass
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
+@dataclass
 class DecisionTransformerDataset(Dataset):
     def __init__(self, max_ep_len: int, train_ep_len: int, gamma: float, path: str, name: str, return_scale: int) -> None:
         self.train_ep_len = train_ep_len
@@ -35,15 +35,48 @@ class DecisionTransformerDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, index: int) -> Dict[str, Any]:
-        sample = self.data[index]
-        ep_len = len(sample['dones'])
+    # callable bec @dataclass
+    def __call__(self, samples) -> Dict[str, Any]:
+        batch_data_indices = np.random.choice(np.arange(len(self.p)), size=len(samples), p=self.p)
+
+        states, actions, returns_to_go, timesteps, attn_masks = [], [], [], [], []
+        for batch_data_index in batch_data_indices:
+            sample = self.data[int(batch_data_index)]
+            ep_len = len(sample['dones'])
+            random_idx = np.random.choice(np.arange(ep_len))
+            
+            states.append(self.get_state(sample, random_idx))
+            actions.append(self.get_action(sample, random_idx))
+            returns_to_go.append(self.get_returns(sample, random_idx))
+            timesteps.append(self.get_timestep(ep_len, random_idx))
+            attn_masks.append(self.get_mask(ep_len, random_idx))
         
-        state = self.get_state(sample, index)
-        action = self.get_action(sample, index)
-        returns_to_go = self.get_returns(sample, index)
-        timesteps = self.get_timestep(ep_len, index)
-        attn_mask = self.get_mask(ep_len, index)
+        states = torch.stack(states, dim=0)
+        actions = torch.stack(actions, dim=0)
+        returns_to_go = torch.stack(returns_to_go, dim=0)
+        timesteps = torch.stack(timesteps, dim=0)
+        attn_masks = torch.stack(attn_masks, dim=0)
+
+        return {
+            "states": states.float(),
+            "actions": actions.float(),
+            "rewards": torch.FloatTensor([], device=DEVICE),
+            "returns_to_go": returns_to_go.float(),
+            "timesteps": timesteps.long(),
+            "attention_mask": attn_masks.float(),
+        }
+    
+    # iterable because inherits from Dataset
+    def __getitem__(self, index) -> Any:
+        sample = self.data[int(index)]
+        ep_len = len(sample['dones'])
+        random_idx = np.random.choice(np.arange(ep_len))
+
+        state = self.get_state(sample, random_idx)
+        action = self.get_action(sample, random_idx)
+        returns_to_go = self.get_returns(sample, random_idx)
+        timesteps = self.get_timestep(ep_len, random_idx)
+        attn_mask = self.get_mask(ep_len, random_idx)
 
         return {
             "states": state.float(),
@@ -53,6 +86,7 @@ class DecisionTransformerDataset(Dataset):
             "timesteps": timesteps.long(),
             "attention_mask": attn_mask.float(),
         }
+    
 
     def get_state(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
         state = torch.tensor(sample['observations'][idx: idx + self.train_ep_len], dtype=float, device=DEVICE)
@@ -105,7 +139,7 @@ class DecisionTransformerDataset(Dataset):
         return obs.mean(axis=0), obs.std(axis=0) + 1e-6, ep_len / ep_len.sum()
 
 
-class DecisionTransformer(DecisionTransformerModel):
+class DT(DecisionTransformerModel):
     def __init__(self, config: DecisionTransformerConfig) -> None:
         super().__init__(config)
 
@@ -122,29 +156,66 @@ class DecisionTransformer(DecisionTransformerModel):
         return F.mse_loss(i[m == 1], o[m == 1])
 
 
-class DecisionTransformerTrainer:
-    def __init__(self, model, config: DecisionTransformerConfig, max_ep_len: int, train_ep_len: int, 
-                gamma: float, lr: float, weight_decay: float, warmup_steps: int, train: bool,
-                dataset_path: str, dataset_name: str, return_scale: int) -> None:
+class DecisionTransformerTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        outputs = model.forward(**inputs)
+
+        action_inp, action_out, mask = inputs['actions'], outputs[1], inputs['attention_mask']
+        loss = model.calc_loss(action_inp, action_out, mask)
+        return (loss, outputs) if return_outputs else loss 
+
+
+class DecisionTransformer:
+    def __init__(self, platform: str, model: DT, config: DecisionTransformerConfig, 
+                max_ep_len: int, train_ep_len: int, gamma: float, lr: float, weight_decay: float, 
+                warmup_steps: int, warmup_ratio: float, train: bool, dataset_path: str, dataset_name: str, 
+                return_scale: int, grad_clip: float) -> None:
         
         if model is not None:
             self.model == model
         elif config is not None:
             self.config = config
-            self.model = DecisionTransformer(self.config)
+            self.model = DT(self.config)
         else:
             raise 'Both model and config can\'t be None!'
         
+        self.grad_clip = grad_clip
+        self.platform = platform
+
         self.model.train()
-        self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-        self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
         self.dtds = DecisionTransformerDataset(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name, return_scale)
 
-    def train(self, epochs: int, batch_size: int, grad_clip: float) -> None:
+        if self.platform == 'pt':
+            self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+            self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
+
+        elif self.platform == 'hf':
+            self.training_args = TrainingArguments(
+                output_dir='./',
+                remove_unused_columns=False,
+                learning_rate=lr,
+                weight_decay=weight_decay,
+                # warmup_steps=warmup_steps,
+                warmup_ratio=warmup_ratio,
+                max_grad_norm=self.grad_clip
+            )
+        else:
+            raise 'Unknown platform {platform}.'
+        
+    def train_and_save(self, epochs: int, batch_size: int, env: str, type_: str, curr_time: int, save_steps: int, logging_steps: int):
+        if self.platform == 'hf':
+            self.trainHF(epochs, batch_size, env, type_, curr_time, save_steps, logging_steps)
+        elif self.platform == 'pt':
+            self.trainPT(epochs, batch_size, env, type_, curr_time, save_steps, logging_steps)
+
+    def trainPT(self, epochs: int, batch_size: int, env: str, type_: str, curr_time: int, save_steps: int, logging_steps: int) -> None:
+        init_time, step_ct = time.time(), 0
+        logs = []
         for epoch in range(1, epochs + 1):
-            iterator = iter(DataLoader(self.dtds, batch_size=batch_size, drop_last=True, shuffle=True, pin_memory=True))
-            for x in iterator:
-                y_pred = self.model.forward(**x)
+            dl = DataLoader(self.dtds, batch_size=batch_size, drop_last=True, shuffle=True, pin_memory=True)
+            iterator, batch_ct = iter(dl), len(dl)
+            for i, x in enumerate(iterator):
+                y_pred = self.model(**x)
 
                 action_inp, action_out, mask = x['actions'], y_pred[1], x['attention_mask']
                 loss = self.model.calc_loss(action_inp, action_out, mask)
@@ -152,28 +223,63 @@ class DecisionTransformerTrainer:
                 self.optim.zero_grad()
                 loss.backward()
 
-                clip_grad_norm_(self.model.parameters(), grad_clip)
+                clip_grad_norm_(self.model.parameters(), self.grad_clip)
                 self.optim.step()
                 self.sched.step()
+                step_ct += 1
 
-            if epoch % 20 == 0:
-                e = DecisionTransformerEvaluator(self.model, self.config, self.dtds.mean, self.dtds.std, f'cheetah_sc_{int(time.time())}')
-                e.evaluate('HalfCheetah-v4', 1, self.dtds.train_ep_len, self.dtds.return_scale, target_reward=12000)
-                print(f'Completed epoch: {epoch}, loss: {loss}')
-        print('Training complete.')
+                if step_ct % save_steps == 0:
+                    self.save_model_pt(env, type_, curr_time, step_ct)
 
-    def save_model(self, env: str, type_: str, time: int) -> bool:
+                if step_ct % logging_steps == 0:
+                    ep, tim = epoch + i/float(batch_ct), time.time() - init_time
+                    print(f'Step: {step_ct}, Epoch: {ep}, loss: {loss}, seconds passed: {tim}')
+                    logs.append({'loss': loss.item(), 'epochs': ep, 'steps': step_ct, 'timestep': tim})
+
+        self.save_logs(logs, f'./cache/pt/logs/{env}_{type_}_{curr_time}.csv')
+        print('Training complete!')
+
+    def save_model_pt(self, env, type_, curr_time, step_ct) -> bool:
         """
         env: cheetah / walker / hopper
         type_: ft (for a fine-tuned model) / sc (if trained from scratch)
         time: int(time.time())
         """
-        torch.save(self.model.cpu().state_dict(), f'./cache/models/{env}_{type_}_{time}.pt')
+        torch.save(self.model.cpu().state_dict(), f'./cache/pt/models/{env}_{type_}_{curr_time}_{step_ct}.pt')
+        self.save_config(f'./cache/pt/configs/{env}_{type_}_{curr_time}_{step_ct}.json')
         
-        cfg = self.config.to_dict()
-        mean, std, _ = self.dtds.get_obs_stats()
-        cfg['train_data_mean'], cfg['train_data_std'] = mean.tolist(), std.tolist()
-        DecisionTransformerConfig().from_dict(cfg).to_json_file(f'./cache/configs/{env}_{type_}_{time}.json')
-
         return True
 
+    def trainHF(self, epochs: int, batch_size: int, env: str, type_: str, curr_time: int, save_steps: int, logging_steps: int):
+        self.training_args.num_train_epochs = epochs
+        self.training_args.per_device_train_batch_size = batch_size
+        self.training_args.save_steps = save_steps
+        self.training_args.logging_steps = logging_steps
+        self.training_args.output_dir = f"./cache/hf/{env}_{type_}_{curr_time}/"
+
+        trainer = DecisionTransformerTrainer(
+            model=self.model,
+            args=self.training_args,
+            train_dataset=self.dtds.data,
+            data_collator=self.dtds
+        )
+        trainer.train()
+        self.save_logs(trainer.state.log_history, f'{self.training_args.output_dir}logs.csv')
+        self.save_config(f'{self.training_args.output_dir}config.json')
+        print('Training complete!')
+
+    def save_config(self, path):
+        cfg = self.config.to_dict()
+        cfg['train_data_mean'], cfg['train_data_std'] = self.dtds.mean.tolist(), self.dtds.std.tolist()
+        DecisionTransformerConfig().from_dict(cfg).to_json_file(path)
+
+    def save_logs(self, logs, path):
+        keys = logs[-1].keys() | logs[0].keys()
+        logs_rounded = [{k: np.round(v, 4) if isinstance(v, float) else v for k, v in d.items()} for d in logs]
+
+        with open(path, 'w', newline='') as output_file:
+            dict_writer = csv.DictWriter(output_file, keys)
+            dict_writer.writeheader()
+            dict_writer.writerows(logs_rounded)
+
+        return True

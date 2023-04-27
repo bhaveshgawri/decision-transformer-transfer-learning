@@ -1,25 +1,24 @@
 import numpy as np
 
 import torch
-from transformers import DecisionTransformerConfig
 import gymnasium as gym
+from transformers import DecisionTransformerConfig
 
 from gif import GIFMaker
+from decision_transformer import DT
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class DecisionTransformerEvaluator:
     def __init__(self, model, config: DecisionTransformerConfig, 
-                train_data_mean: torch.Tensor, train_data_std: torch.Tensor, file_name: str) -> None:
+                train_data_mean: torch.Tensor, train_data_std: torch.Tensor) -> None:
         self.config = config
         self.model = model
         self.model.eval()
 
         self.obs_mean = train_data_mean
         self.obs_std = train_data_std
-
-        self.file_name = file_name
 
         self.env = None
         self.g = GIFMaker()
@@ -59,8 +58,8 @@ class DecisionTransformerEvaluator:
             "attention_mask": msk,
         }
 
-    def evaluate(self, env: str, iterations: int, test_ep_len: int, reward_scale: float, target_reward: int=5000) -> None:
-        self.env = gym.make(env, render_mode = "rgb_array")
+    def evaluate(self, gym_env: str, iterations: int, test_ep_len: int, gif_save_path: str, reward_scale: float, target_reward: int=5000) -> None:
+        self.env = gym.make(gym_env, render_mode = "rgb_array")
 
         with torch.no_grad():
             for iteration in range(1, iterations + 1):
@@ -97,19 +96,24 @@ class DecisionTransformerEvaluator:
                     if terminated or truncated: break
 
                 if render:
-                    self.g.save(f'{self.file_name}_{iteration}')
+                    self.g.save(f'{gif_save_path}_{iteration}.gif')
                     self.g.reset()
             self.env.close()
+            print("Evaluation complete!")
 
-    # @staticmethod
-    # def load_weights(file_name: str) -> 'DecisionTransformerEvaluator':
-    #     config = DecisionTransformerConfig().from_json_file(f'./cache/configs/{file_name}.json').to_dict()
-    #     mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
-    #                 torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
+    @staticmethod
+    def load_weights(platform: str, config_path: str, model_path) -> 'DecisionTransformerEvaluator':
+        config = DecisionTransformerConfig().from_json_file(config_path).to_dict()
+        mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
+                    torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
 
-    #     config = DecisionTransformerConfig().from_dict(config)
-    #     model = DecisionTransformer(config)
-    #     model.load_state_dict(torch.load(f'./cache/models/{file_name}.pt'))
-    #     dt_eval = DecisionTransformerEvaluator(model, config, mean, std, file_name)
+        config = DecisionTransformerConfig().from_dict(config)
+        model = DT(config)
 
-    #     return dt_eval
+        if platform == 'pt':
+            model.load_state_dict(torch.load(model_path))
+        elif platform == 'hf':
+            model = DT.from_pretrained(model_path)
+        dt_eval = DecisionTransformerEvaluator(model, config, mean, std)
+
+        return dt_eval

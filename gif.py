@@ -23,8 +23,8 @@ class GIFMaker:
         display(gif)
         return gif
     
-    def save(self, file_name):
-        imageio.mimsave(f'./cache/outputs/{file_name}.gif', self.images, format='gif')
+    def save(self, file_path):
+        imageio.mimsave(file_path, self.images, format='gif')
 
     def __len__(self):
       return len(self.images)
