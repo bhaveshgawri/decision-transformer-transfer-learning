@@ -2,19 +2,23 @@ import numpy as np
 
 import torch
 from torch.optim import AdamW
+import torch.nn.functional as F
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.lr_scheduler import LambdaLR
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from datasets import load_dataset
 from transformers import DecisionTransformerModel, DecisionTransformerConfig
 
+import time
 from typing import Any, Dict, Tuple
+
+from DecisionTransformerEvaluator import DecisionTransformerEvaluator
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-class DecisionTransformerDataLoader(Dataset):
+class DecisionTransformerDataset(Dataset):
     def __init__(self, max_ep_len: int, train_ep_len: int, gamma: float, path: str, name: str, return_scale: int) -> None:
         self.train_ep_len = train_ep_len
         self.max_ep_len = max_ep_len
@@ -32,36 +36,22 @@ class DecisionTransformerDataLoader(Dataset):
         return len(self.data)
 
     def __getitem__(self, index: int) -> Dict[str, Any]:
-        return self.data[index]
-
-    def get_batch(self, batch_size: int = 8) -> Dict[str, Any]:
-        batch_data_indices = np.random.choice(np.arange(len(self.p)), size=batch_size, p=self.p)
-
-        states, actions, returns_to_go, timesteps, attn_masks = [], [], [], [], []
-        for batch_data_index in batch_data_indices:
-            sample = self.data[int(batch_data_index)]
-            ep_len = len(sample['dones'])
-            random_idx = np.random.choice(np.arange(ep_len))
-            
-            states.append(self.get_state(sample, random_idx))
-            actions.append(self.get_action(sample, random_idx))
-            returns_to_go.append(self.get_returns(sample, random_idx))
-            timesteps.append(self.get_timestep(ep_len, random_idx))
-            attn_masks.append(self.get_mask(ep_len, random_idx))
+        sample = self.data[index]
+        ep_len = len(sample['dones'])
         
-        states = torch.stack(states, dim=0)
-        actions = torch.stack(actions, dim=0)
-        returns_to_go = torch.stack(returns_to_go, dim=0)
-        timesteps = torch.stack(timesteps, dim=0)
-        attn_masks = torch.stack(attn_masks, dim=0)
+        state = self.get_state(sample, index)
+        action = self.get_action(sample, index)
+        returns_to_go = self.get_returns(sample, index)
+        timesteps = self.get_timestep(ep_len, index)
+        attn_mask = self.get_mask(ep_len, index)
 
         return {
-            "states": states.float(),
-            "actions": actions.float(),
+            "states": state.float(),
+            "actions": action.float(),
             "rewards": torch.FloatTensor([], device=DEVICE),
             "returns_to_go": returns_to_go.float(),
             "timesteps": timesteps.long(),
-            "attention_mask": attn_masks.float(),
+            "attention_mask": attn_mask.float(),
         }
 
     def get_state(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
@@ -69,23 +59,23 @@ class DecisionTransformerDataLoader(Dataset):
         
         zeros = torch.zeros(self.train_ep_len - state.shape[0], self.state_dim, dtype=float, device=DEVICE)
         state = torch.cat([zeros, state], dim=0)
-        state = state - self.mean / self.std
+        state = (state - self.mean) / self.std
         return state
 
     def get_action(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
         action = torch.tensor(sample['actions'][idx: idx + self.train_ep_len], dtype=float, device=DEVICE)
 
-        zeros = torch.zeros(self.train_ep_len - action.shape[0], self.action_dim, dtype=float, device=DEVICE)
+        zeros = torch.ones(self.train_ep_len - action.shape[0], self.action_dim, dtype=float, device=DEVICE) * -10
         action = torch.cat([zeros, action], dim=0)
         return action
 
     def get_returns(self, sample: Dict[str, Any], idx: int) -> torch.Tensor:
-        returns = sample['rewards'][idx: idx + self.train_ep_len]
+        returns = sample['rewards']
         r = 0
         for i, reward in reversed(list(enumerate(returns))):
             r = reward + self.gamma * r
             returns[i] = r
-        returns = torch.tensor(returns, dtype=float, device=DEVICE)
+        returns = torch.tensor(returns, dtype=float, device=DEVICE)[idx: idx + self.train_ep_len]
 
         zeros = torch.zeros(self.train_ep_len - returns.shape[0], dtype=float, device=DEVICE)
         returns = torch.cat([zeros, returns], dim=0) / self.return_scale
@@ -120,17 +110,16 @@ class DecisionTransformer(DecisionTransformerModel):
         super().__init__(config)
 
         self.action_dim = config.act_dim
-        self.loss = torch.nn.MSELoss()
         self.to(DEVICE)
 
-    def forward(self, **x: Dict[str, Any]) -> (Tuple | Any):
+    def forward(self, **x: Dict[str, Any]):
         return super().forward(**x)
 
-    def calc_loss(self, inp: torch.Tensor, out: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def calc_loss(self, inp: torch.Tensor, out: torch.Tensor, mask: torch.Tensor):
         i = inp.reshape(-1, self.action_dim)
         o = out.reshape(-1, self.action_dim)
         m = mask.reshape(-1)
-        return self.loss(i[m == 1], o[m == 1])
+        return F.mse_loss(i[m == 1], o[m == 1])
 
 
 class DecisionTransformerTrainer:
@@ -149,13 +138,13 @@ class DecisionTransformerTrainer:
         self.model.train()
         self.optim = AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.sched = LambdaLR(self.optim, lambda steps: min((steps + 1) / warmup_steps, 1))
-        self.dtdl = DecisionTransformerDataLoader(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name, return_scale)
+        self.dtds = DecisionTransformerDataset(max_ep_len, train_ep_len, gamma, dataset_path, dataset_name, return_scale)
 
-    def train(self, epochs: int, itr_per_epoch: int, batch_size: int, grad_clip: float) -> None:
-        for epoch in range(epochs):
-            for itr in range(itr_per_epoch):        
-                x = self.dtdl.get_batch(batch_size=batch_size)
-                y_pred = self.model(**x)
+    def train(self, epochs: int, batch_size: int, grad_clip: float) -> None:
+        for epoch in range(1, epochs + 1):
+            iterator = iter(DataLoader(self.dtds, batch_size=batch_size, drop_last=True, shuffle=True, pin_memory=True))
+            for x in iterator:
+                y_pred = self.model.forward(**x)
 
                 action_inp, action_out, mask = x['actions'], y_pred[1], x['attention_mask']
                 loss = self.model.calc_loss(action_inp, action_out, mask)
@@ -167,7 +156,10 @@ class DecisionTransformerTrainer:
                 self.optim.step()
                 self.sched.step()
 
-            print(f'Completed epoch: {epoch + 1}, loss: {loss}')
+            if epoch % 20 == 0:
+                e = DecisionTransformerEvaluator(self.model, self.config, self.dtds.mean, self.dtds.std, f'cheetah_sc_{int(time.time())}')
+                e.evaluate('HalfCheetah-v4', 1, self.dtds.train_ep_len, self.dtds.return_scale, target_reward=12000)
+                print(f'Completed epoch: {epoch}, loss: {loss}')
         print('Training complete.')
 
     def save_model(self, env: str, type_: str, time: int) -> bool:
@@ -179,7 +171,7 @@ class DecisionTransformerTrainer:
         torch.save(self.model.cpu().state_dict(), f'./cache/models/{env}_{type_}_{time}.pt')
         
         cfg = self.config.to_dict()
-        mean, std, _ = self.dtdl.get_obs_stats()
+        mean, std, _ = self.dtds.get_obs_stats()
         cfg['train_data_mean'], cfg['train_data_std'] = mean.tolist(), std.tolist()
         DecisionTransformerConfig().from_dict(cfg).to_json_file(f'./cache/configs/{env}_{type_}_{time}.json')
 

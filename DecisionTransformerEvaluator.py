@@ -4,14 +4,13 @@ import torch
 from transformers import DecisionTransformerConfig
 import gymnasium as gym
 
-from decision_transformer import DecisionTransformer
 from gif import GIFMaker
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class DecisionTransformerEvaluator:
-    def __init__(self, model: DecisionTransformer, config: DecisionTransformerConfig, 
+    def __init__(self, model, config: DecisionTransformerConfig, 
                 train_data_mean: torch.Tensor, train_data_std: torch.Tensor, file_name: str) -> None:
         self.config = config
         self.model = model
@@ -102,15 +101,15 @@ class DecisionTransformerEvaluator:
                     self.g.reset()
             self.env.close()
 
-    @staticmethod
-    def load_weights(file_name: str) -> 'DecisionTransformerEvaluator':
-        config = DecisionTransformerConfig().from_json_file(f'./cache/configs/{file_name}.json').to_dict()
-        mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
-                    torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
+    # @staticmethod
+    # def load_weights(file_name: str) -> 'DecisionTransformerEvaluator':
+    #     config = DecisionTransformerConfig().from_json_file(f'./cache/configs/{file_name}.json').to_dict()
+    #     mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
+    #                 torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
 
-        config = DecisionTransformerConfig().from_dict(config)
-        model = DecisionTransformer(config)
-        model.load_state_dict(torch.load(f'./cache/models/{file_name}.pt'))
-        dt_eval = DecisionTransformerEvaluator(model, config, mean, std, file_name)
+    #     config = DecisionTransformerConfig().from_dict(config)
+    #     model = DecisionTransformer(config)
+    #     model.load_state_dict(torch.load(f'./cache/models/{file_name}.pt'))
+    #     dt_eval = DecisionTransformerEvaluator(model, config, mean, std, file_name)
 
-        return dt_eval
+    #     return dt_eval
