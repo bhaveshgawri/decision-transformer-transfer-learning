@@ -7,9 +7,9 @@ from src.DTEvaluator import DecisionTransformerEvaluator
 from transformers import DecisionTransformerConfig
 
 runtime_env='dev'
-# runtime_env='prod'
+runtime_env='prod'
 
-platform = 'hf'
+platform = 'pt'
 
 max_ep_len = 1000
 train_ep_len = test_ep_len = 20 # K
@@ -26,7 +26,7 @@ if runtime_env == 'dev':
     save_steps=48
 
 
-def train(props: Properties):
+def train(props: Properties) -> None:
     curr_time = int(time.time())
     cfg = DecisionTransformerConfig(state_dim=props.get_state_dim(), act_dim=props.get_action_dim(), max_ep_len=max_ep_len, drop_out=drop_out)
     transformerRunner = DecisionTransformerRunner(platform, None, cfg, max_ep_len, train_ep_len, gamma, lr, 
@@ -37,12 +37,12 @@ def train(props: Properties):
     transformerRunner.train_and_save(train_epochs, batch_size, props.get_env(), props.get_type(), curr_time, save_steps, logging_steps)    
 
 
-def eval(props: Properties, src_cfg_path: str, src_mdl_path: str, out_path: str, target: int):
+def eval(props: Properties, src_cfg_path: str, src_mdl_path: str, out_path: str, target: int) -> None:
     evaluator = DecisionTransformerEvaluator.load_weights(platform, src_cfg_path, src_mdl_path)
     evaluator.evaluate(props.get_gym_env(), test_epochs, test_ep_len, out_path, reward_scale, target_reward=target, render=True)
 
 
-def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str):
+def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str) -> None:
     curr_time = int(time.time())
     evaluator = DecisionTransformerEvaluator.load_weights(platform, src_cfg_path, src_mdl_path)
     transformerRunner = DecisionTransformerRunner(platform, evaluator.model, None, max_ep_len, train_ep_len, gamma, lr, 
@@ -54,8 +54,8 @@ def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str):
 
 if __name__ == '__main__':
     # train(Properties('cheetah', 'sc'))
-    # eval(Properties('cheetah', 'sc'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', './cache/pt/outputs/cheetah_sc_1682575937_1500', 10000) #pt
-    eval(Properties('cheetah', 'sc'), 'cache/hf/cheetah_sc_1682577402/config.json', 'cache/hf/cheetah_sc_1682577402/checkpoint-1600', 'cache/hf/cheetah_sc_1682577402/output', 10000)                    #hf
+    # eval(Properties('cheetah', 'sc'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', './cache/pt/outputs/cheetah_sc_1682575937_1500', 10000)    #pt
+    # eval(Properties('cheetah', 'sc'), 'cache/hf/cheetah_sc_1682577402/config.json', 'cache/hf/cheetah_sc_1682577402/checkpoint-1600', 'cache/hf/cheetah_sc_1682577402/output', 10000)                     #hf
     # finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt')
     pass
 

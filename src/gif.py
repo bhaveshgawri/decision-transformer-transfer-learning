@@ -4,6 +4,8 @@ from io import BytesIO
 
 from pyvirtualdisplay import Display
 
+import numpy as np
+
 class GIFMaker:
     def __init__(self) -> None:
         self.reset()
@@ -14,10 +16,10 @@ class GIFMaker:
         self.images = []
         self.buffer = BytesIO()
   
-    def append(self, img) -> None:
+    def append(self, img: np.ndarray[int]) -> None:
         self.images.append(img)
 
-    def display(self):
+    def display(self) -> Image:
         imageio.mimsave(self.buffer, self.images, format='gif')
         gif = Image(data=self.buffer.getvalue())
         display(gif)
