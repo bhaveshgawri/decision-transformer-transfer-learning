@@ -8,8 +8,10 @@ from src.gif import GIFMaker
 from src.DTModel import DecisionTransformer
 from src.utils import DEVICE
 
+from typing import Dict
+
 class DecisionTransformerEvaluator:
-    def __init__(self, model, config: DecisionTransformerConfig, 
+    def __init__(self, model: DecisionTransformer, config: DecisionTransformerConfig, 
                 train_data_mean: torch.Tensor, train_data_std: torch.Tensor) -> None:
         self.config = config
         self.model = model
@@ -23,11 +25,13 @@ class DecisionTransformerEvaluator:
         self.env = None
         self.g = GIFMaker()
 
-    def reset_env(self):
+    def reset_env(self) -> torch.Tensor:
         state = self.env.reset(seed = np.random.randint(low=1, high=100000))
         return torch.tensor(state[0].tolist(), device=DEVICE).float()
 
-    def pad_inputs(self, observations, actions, returns_to_go, timesteps, timestep, test_ep_len):
+    def pad_inputs(self, observations: torch.Tensor, actions: torch.Tensor, 
+                   returns_to_go: torch.Tensor, timesteps: torch.Tensor, 
+                   timestep: int, test_ep_len: int) -> Dict[str, torch.Tensor]:
         pad_len = max(0, test_ep_len - (timestep + 1))
 
         st, en = timestep + 1 - test_ep_len, timestep + 1
@@ -46,7 +50,8 @@ class DecisionTransformerEvaluator:
         zeros = torch.zeros(1, pad_len, device=DEVICE).long()
         tim = torch.cat([zeros, timesteps[:, st: en]], dim=1)
 
-        zeros, ones = torch.zeros(1, pad_len, device=DEVICE).float(), torch.ones(1, test_ep_len - pad_len, device=DEVICE).float()
+        zeros = torch.zeros(1, pad_len, device=DEVICE).float()
+        ones = torch.ones(1, test_ep_len - pad_len, device=DEVICE).float()
         msk = torch.cat([zeros, ones], dim=1)
 
         return {
@@ -58,8 +63,9 @@ class DecisionTransformerEvaluator:
             "attention_mask": msk,
         }
 
-    def evaluate(self, gym_env: str, iterations: int, test_ep_len: int, gif_save_path: str, 
-                reward_scale: float, target_reward: int=5000, render: bool=False, eval_model: DecisionTransformer=None) -> torch.Tensor:
+    def evaluate(self, gym_env: str, iterations: int, test_ep_len: int, 
+                gif_save_path: str, reward_scale: float, target_reward: int=5000, 
+                render: bool=False, eval_model: DecisionTransformer=None) -> torch.Tensor:
         self.env = gym.make(gym_env, render_mode = "rgb_array")
         
         ep_rewards = []
@@ -107,7 +113,7 @@ class DecisionTransformerEvaluator:
             return torch.tensor(ep_rewards, device=DEVICE).float()
 
     @staticmethod
-    def load_weights(platform: str, config_path: str, model_path) -> 'DecisionTransformerEvaluator':
+    def load_weights(platform: str, config_path: str, model_path: str) -> 'DecisionTransformerEvaluator':
         config = DecisionTransformerConfig().from_json_file(config_path).to_dict()
         mean, std = torch.tensor(config.pop('train_data_mean', None), device=DEVICE).float(), \
                     torch.tensor(config.pop('train_data_std', None), device=DEVICE).float()
