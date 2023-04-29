@@ -3,7 +3,7 @@
   "action_tanh": true,
   "activation_function": "relu",
   "architectures": [
-    "DT"
+    "DecisionTransformer"
   ],
   "attn_pdrop": 0.1,
   "bos_token_id": 50256,

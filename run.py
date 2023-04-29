@@ -1,14 +1,15 @@
 import time
 
-from decision_transformer import DecisionTransformer
-from DecisionTransformerEvaluator import DecisionTransformerEvaluator
+from src.utils import Properties
+from src.DTRunner import DecisionTransformerRunner
+from src.DTEvaluator import DecisionTransformerEvaluator
 
 from transformers import DecisionTransformerConfig
 
 runtime_env='dev'
-runtime_env='prod'
+# runtime_env='prod'
 
-platform = 'pt'
+platform = 'hf'
 
 max_ep_len = 1000
 train_ep_len = test_ep_len = 20 # K
@@ -19,38 +20,50 @@ lr, weight_decay = 0.0001, 0.0001
 reward_scale = 1000
 save_steps, logging_steps = 800, 5
 if runtime_env == 'dev':
-    train_epochs = 4
+    train_epochs = 3
+    logging_steps = 1
+    warmup_steps = 1
+    save_steps=48
 
 
-def train():
+def train(props: Properties):
     curr_time = int(time.time())
-    cheetah_cfg = DecisionTransformerConfig(state_dim=17, act_dim=6, max_ep_len=max_ep_len, drop_out=drop_out)
-    cheetahTransformerRunner = DecisionTransformer(platform, None, cheetah_cfg, max_ep_len, train_ep_len, gamma, lr, 
+    cfg = DecisionTransformerConfig(state_dim=props.get_state_dim(), act_dim=props.get_action_dim(), max_ep_len=max_ep_len, drop_out=drop_out)
+    transformerRunner = DecisionTransformerRunner(platform, None, cfg, max_ep_len, train_ep_len, gamma, lr, 
+                                                        weight_decay, warmup_steps, warmup_ratio, False, 
+                                                        "edbeeching/decision_transformer_gym_replay", 
+                                                        props.get_dataset_name(), reward_scale, grad_clip, props)
+
+    transformerRunner.train_and_save(train_epochs, batch_size, props.get_env(), props.get_type(), curr_time, save_steps, logging_steps)    
+
+
+def eval(props: Properties, src_cfg_path: str, src_mdl_path: str, out_path: str, target: int):
+    evaluator = DecisionTransformerEvaluator.load_weights(platform, src_cfg_path, src_mdl_path)
+    evaluator.evaluate(props.get_gym_env(), test_epochs, test_ep_len, out_path, reward_scale, target_reward=target, render=True)
+
+
+def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str):
+    curr_time = int(time.time())
+    evaluator = DecisionTransformerEvaluator.load_weights(platform, src_cfg_path, src_mdl_path)
+    transformerRunner = DecisionTransformerRunner(platform, evaluator.model, None, max_ep_len, train_ep_len, gamma, lr, 
                                                         weight_decay, warmup_steps, warmup_ratio, True, 
                                                         "edbeeching/decision_transformer_gym_replay", 
-                                                        "halfcheetah-expert-v2", reward_scale, grad_clip)
+                                                        props.get_dataset_name(), reward_scale, grad_clip, props)
+    transformerRunner.train_and_save(train_epochs, batch_size, props.get_env(), props.get_type(), curr_time, save_steps, logging_steps) 
 
-    cheetahTransformerRunner.train_and_save(train_epochs, batch_size, 'cheetah', 'sc', curr_time, save_steps, logging_steps)    
-
-def eval():
-    # cheetahEval = DecisionTransformerEvaluator.load_weights(platform, './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt')
-    # cheetahEval.evaluate('HalfCheetah-v4', test_epochs, test_ep_len, './cache/pt/outputs/cheetah_sc_1682575937_1500', reward_scale, target_reward=12000)
-
-    # cheetahEval = DecisionTransformerEvaluator.load_weights(platform, './cache/hf/cheetah_sc_1682577402/config.json', './cache/hf/cheetah_sc_1682577402/checkpoint-1600')
-    # cheetahEval.evaluate('HalfCheetah-v4', test_epochs, test_ep_len, './cache/hf/cheetah_sc_1682577402/output', reward_scale, target_reward=12000)
-    pass
 
 if __name__ == '__main__':
-    # train()
-    # eval()
+    # train(Properties('cheetah', 'sc'))
+    # eval(Properties('cheetah', 'sc'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', './cache/pt/outputs/cheetah_sc_1682575937_1500', 10000) #pt
+    eval(Properties('cheetah', 'sc'), 'cache/hf/cheetah_sc_1682577402/config.json', 'cache/hf/cheetah_sc_1682577402/checkpoint-1600', 'cache/hf/cheetah_sc_1682577402/output', 10000)                    #hf
+    # finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt')
     pass
-
 
 
 """
 Cheetah scratch train config:
     target_reward = 12000
-    platform = 'pt
+    platform = 'pt'
         max_ep_len = 1000
         train_ep_len = test_ep_len = 20 # K
         train_epochs, batch_size, test_epochs = 100, 64, 1

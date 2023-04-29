@@ -1,6 +1,8 @@
-gymnasium[mujoco]
+gymnasium
+mujoco==2.3.3
 transformers
 datasets
 torch
 ipykernel
 pyvirtualdisplay
+imageio
