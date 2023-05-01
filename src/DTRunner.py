@@ -168,3 +168,5 @@ class DecisionTransformerRunner:
             self.model.embed_state = torch.nn.Linear(ft_obs_dim, self.config.hidden_size, device=DEVICE)
             self.model.predict_state = torch.nn.Linear(self.config.hidden_size, ft_obs_dim, device=DEVICE)
             self.model.config.state_dim = ft_obs_dim
+        
+        print([(p[0], p[1].requires_grad) for p in self.model.named_parameters()])
