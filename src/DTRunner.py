@@ -20,8 +20,8 @@ from src.DTEvaluator import DecisionTransformerEvaluator
 class DecisionTransformerRunner:
     def __init__(self, platform: str, model: DecisionTransformer, config: DecisionTransformerConfig, 
                 max_ep_len: int, train_ep_len: int, gamma: float, lr: float, weight_decay: float, 
-                warmup_steps: int, warmup_ratio: float, fine_tune: bool, dataset_path: str, dataset_name: str, 
-                return_scale: int, grad_clip: float, props: Properties) -> None:
+                warmup_steps: int, warmup_ratio: float, fine_tune: bool, only_embed_and_final_layer: bool, 
+                dataset_path: str, dataset_name: str, return_scale: int, grad_clip: float, props: Properties) -> None:
 
         if model is not None:
             self.model = model
@@ -33,7 +33,7 @@ class DecisionTransformerRunner:
             raise 'Both model and config can\'t be None!'
         
         if fine_tune:
-            self.modify_model_arch(props)
+            self.modify_model_arch(props, only_embed_and_final_layer)
             self.config = self.model.config
 
         self.grad_clip = grad_clip
@@ -153,7 +153,10 @@ class DecisionTransformerRunner:
 
         return True
     
-    def modify_model_arch(self, props: Properties) -> None:
+    def modify_model_arch(self, props: Properties, only_embed_and_final_layer: bool) -> None:
+        if only_embed_and_final_layer:
+            for param in self.model.encoder.parameters():
+                param.requires_grad = False
         ft_act_dim = props.get_action_dim()
         ft_obs_dim = props.get_state_dim()
         if ft_act_dim != self.config.act_dim:

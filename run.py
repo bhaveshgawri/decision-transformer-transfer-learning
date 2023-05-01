@@ -30,10 +30,9 @@ def train(props: Properties) -> None:
     curr_time = int(time.time())
     cfg = DecisionTransformerConfig(state_dim=props.get_state_dim(), act_dim=props.get_action_dim(), max_ep_len=max_ep_len, drop_out=drop_out)
     transformerRunner = DecisionTransformerRunner(platform, None, cfg, max_ep_len, train_ep_len, gamma, lr, 
-                                                        weight_decay, warmup_steps, warmup_ratio, False, 
+                                                        weight_decay, warmup_steps, warmup_ratio, False, False,
                                                         "edbeeching/decision_transformer_gym_replay", 
                                                         props.get_dataset_name(), reward_scale, grad_clip, props)
-
     transformerRunner.train_and_save(train_epochs, batch_size, props.get_env(), props.get_type(), curr_time, save_steps, logging_steps)    
 
 
@@ -42,11 +41,11 @@ def eval(props: Properties, src_cfg_path: str, src_mdl_path: str, out_path: str,
     evaluator.evaluate(props.get_gym_env(), test_epochs, test_ep_len, out_path, reward_scale, target_reward=target, render=True)
 
 
-def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str) -> None:
+def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str, only_final_layer: bool) -> None:
     curr_time = int(time.time())
     evaluator = DecisionTransformerEvaluator.load_weights(platform, src_cfg_path, src_mdl_path)
     transformerRunner = DecisionTransformerRunner(platform, evaluator.model, None, max_ep_len, train_ep_len, gamma, lr, 
-                                                        weight_decay, warmup_steps, warmup_ratio, True, 
+                                                        weight_decay, warmup_steps, warmup_ratio, True, only_final_layer,
                                                         "edbeeching/decision_transformer_gym_replay", 
                                                         props.get_dataset_name(), reward_scale, grad_clip, props)
     transformerRunner.train_and_save(train_epochs, batch_size, props.get_env(), props.get_type(), curr_time, save_steps, logging_steps) 
@@ -56,19 +55,19 @@ if __name__ == '__main__':
     # train(Properties('cheetah', 'sc'))
     # eval(Properties('cheetah', 'sc'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', './cache/pt/outputs/cheetah_sc_1682575937_1500', 10000)    #pt
     # eval(Properties('cheetah', 'sc'), 'cache/hf/cheetah_sc_1682577402/config.json', 'cache/hf/cheetah_sc_1682577402/checkpoint-1600', 'cache/hf/cheetah_sc_1682577402/output', 10000)                     #hf
-    # finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt')
+    # finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', False)
     # train(Properties('cheetah', 'sc'))
     # train(Properties('hopper', 'sc'))
     # train(Properties('walker', 'sc'))
-    finetune(Properties('cheetah', 'ft'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt')
-    finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt')
-    finetune(Properties('walker', 'ft'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt')
-    finetune(Properties('cheetah', 'ft'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt')
-    finetune(Properties('hopper', 'ft'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt')
-    finetune(Properties('walker', 'ft'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt')
-    finetune(Properties('cheetah', 'ft'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt')
-    finetune(Properties('hopper', 'ft'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt')
-    finetune(Properties('walker', 'ft'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt')
+    finetune(Properties('cheetah', 'ft_cheetah_sc_1682905510_1500'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt', True)
+    finetune(Properties('hopper', 'ft_cheetah_sc_1682905510_1500'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt', True)
+    finetune(Properties('walker', 'ft_cheetah_sc_1682905510_1500'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt', True)
+    finetune(Properties('cheetah', 'ft_hopper_sc_1682909019_1600'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt', True)
+    finetune(Properties('hopper', 'ft_hopper_sc_1682909019_1600'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt', True)
+    finetune(Properties('walker', 'ft_hopper_sc_1682909019_1600'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt', True)
+    finetune(Properties('cheetah', 'ft_walker_sc_1682910403_1500'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', True)
+    finetune(Properties('hopper', 'ft_walker_sc_1682910403_1500'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', True)
+    finetune(Properties('walker', 'ft_walker_sc_1682910403_1500'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', True)
     pass
 
 
