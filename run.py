@@ -18,12 +18,12 @@ warmup_steps, warmup_ratio, grad_clip = 320, 0.1, 0.25
 drop_out, gamma = 0.1, 1
 lr, weight_decay = 0.0001, 0.0001
 reward_scale = 1000
-save_steps, logging_steps = 800, 5
+save_steps, logging_steps = 801, 5
 if runtime_env == 'dev':
-    train_epochs = 3
+    train_epochs = 1
     logging_steps = 1
     warmup_steps = 1
-    save_steps=48
+    save_steps=11
 
 
 def train(props: Properties) -> None:
@@ -57,6 +57,18 @@ if __name__ == '__main__':
     # eval(Properties('cheetah', 'sc'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', './cache/pt/outputs/cheetah_sc_1682575937_1500', 10000)    #pt
     # eval(Properties('cheetah', 'sc'), 'cache/hf/cheetah_sc_1682577402/config.json', 'cache/hf/cheetah_sc_1682577402/checkpoint-1600', 'cache/hf/cheetah_sc_1682577402/output', 10000)                     #hf
     # finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt')
+    # train(Properties('cheetah', 'sc'))
+    # train(Properties('hopper', 'sc'))
+    # train(Properties('walker', 'sc'))
+    finetune(Properties('cheetah', 'ft'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt')
+    finetune(Properties('hopper', 'ft'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt')
+    finetune(Properties('walker', 'ft'), './cache/pt/configs/cheetah_sc_1682905510_1500.json', './cache/pt/models/cheetah_sc_1682905510_1500.pt')
+    finetune(Properties('cheetah', 'ft'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt')
+    finetune(Properties('hopper', 'ft'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt')
+    finetune(Properties('walker', 'ft'), './cache/pt/configs/hopper_sc_1682909019_1600.json', './cache/pt/models/hopper_sc_1682909019_1600.pt')
+    finetune(Properties('cheetah', 'ft'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt')
+    finetune(Properties('hopper', 'ft'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt')
+    finetune(Properties('walker', 'ft'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt')
     pass
 
 

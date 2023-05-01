@@ -103,6 +103,7 @@ class DecisionTransformerRunner:
                     print(f'Step: {step_ct}/{epochs*batch_ct}, loss: {loss}, rewards: {rewards}, time passed: {tim}s, epoch: {ep}')
                     logs.append({'loss': loss.item(), 'epochs': ep, 'steps': step_ct, 'time': tim, 'rewards': rewards})
 
+        self.save_model_pt(env, type_, curr_time, step_ct)
         self.save_logs(logs, f'./cache/pt/logs/{env}_{type_}_{curr_time}.csv')
         print('Training complete!')
 
