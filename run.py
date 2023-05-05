@@ -53,76 +53,13 @@ def finetune(props: Properties, src_cfg_path: str, src_mdl_path: str, encoder_ft
 
 
 if __name__ == '__main__':
-    plot_files = [{'cheetah_h0_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 0', 
-                  'cheetah_h1_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 1', 
-                  'cheetah_h2_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 2', 
-                  'cheetah_h3_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'cheetah_sc_1682905510': 'scratch'},
-                  {'cheetah_h0_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 0', 
-                  'cheetah_h1_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 1', 
-                  'cheetah_h2_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 2', 
-                  'cheetah_h3_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'cheetah_sc_1682905510': 'scratch'},
-                  {'cheetah_h0_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 0', 
-                  'cheetah_h1_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 1', 
-                  'cheetah_h2_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 2', 
-                  'cheetah_h3_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'cheetah_sc_1682905510': 'scratch'},
-
-                  {'hopper_h0_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 0', 
-                  'hopper_h1_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 1', 
-                  'hopper_h2_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 2', 
-                  'hopper_h3_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'hopper_sc_1682909019': 'scratch'},
-                  {'hopper_h0_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 0', 
-                  'hopper_h1_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 1', 
-                  'hopper_h2_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 2', 
-                  'hopper_h3_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'hopper_sc_1682909019': 'scratch'},
-                  {'hopper_h0_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 0', 
-                  'hopper_h1_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 1', 
-                  'hopper_h2_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 2', 
-                  'hopper_h3_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'hopper_sc_1682909019': 'scratch'},
-
-                  {'walker_h0_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 0', 
-                  'walker_h1_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 1', 
-                  'walker_h2_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 2', 
-                  'walker_h3_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'walker_sc_1682910403': 'scratch'},
-                  {'walker_h0_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 0', 
-                  'walker_h1_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 1', 
-                  'walker_h2_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 2', 
-                  'walker_h3_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'walker_sc_1682910403': 'scratch'},
-                  {'walker_h0_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 0', 
-                  'walker_h1_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 1', 
-                  'walker_h2_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 2', 
-                  'walker_h3_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
-                  'walker_sc_1682910403': 'scratch'}
-    ]
-    titles =['cheetah_fine_tuned_on_cheetah', 
-             'cheetah_fine_tuned_on_hopper',
-             'cheetah_fine_tuned_on_walker',
-
-             'hopper_fine_tuned_on_cheetah', 
-             'hopper_fine_tuned_on_hopper',
-             'hopper_fine_tuned_on_walker',
-
-             'walker_fine_tuned_on_cheetah', 
-             'walker_fine_tuned_on_hopper',
-             'walker_fine_tuned_on_walker']
-
-    for file_grp, title in zip(plot_files, titles):
-        plot(file_grp, title)
-
     # training
     # train(Properties('cheetah', 'sc'))
     # train(Properties('hopper', 'sc'))
     # train(Properties('walker', 'sc'))
 
     # evaluation
-    # eval(Properties('cheetah', 'sc'), './cache/pt/configs/cheetah_sc_1682575937_1500.json', './cache/pt/models/cheetah_sc_1682575937_1500.pt', './cache/pt/outputs/cheetah_sc_1682575937_1500', 10000)    #pt
+    # eval(Properties('walker', 'sc'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', './cache/pt/outputs/walker_sc_1682910403_1500', 5000)
     
     # finetuning
     # curr_time = int(time.time())
@@ -136,4 +73,68 @@ if __name__ == '__main__':
     #     finetune(Properties('cheetah', f'h{len(ft_layers)}_ft_walker_sc_1682910403_1500'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', ft_layers, curr_time)
     #     finetune(Properties('hopper', f'h{len(ft_layers)}_ft_walker_sc_1682910403_1500'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', ft_layers, curr_time)
     #     finetune(Properties('walker', f'h{len(ft_layers)}_ft_walker_sc_1682910403_1500'), './cache/pt/configs/walker_sc_1682910403_1500.json', './cache/pt/models/walker_sc_1682910403_1500.pt', ft_layers, curr_time)
+
+    # plotting
+    # plot_files = [{'cheetah_h0_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 0', 
+    #               'cheetah_h1_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 1', 
+    #               'cheetah_h2_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 2', 
+    #               'cheetah_h3_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'cheetah_sc_1682905510': 'scratch'},
+    #               {'cheetah_h0_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 0', 
+    #               'cheetah_h1_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 1', 
+    #               'cheetah_h2_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 2', 
+    #               'cheetah_h3_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'cheetah_sc_1682905510': 'scratch'},
+    #               {'cheetah_h0_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 0', 
+    #               'cheetah_h1_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 1', 
+    #               'cheetah_h2_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 2', 
+    #               'cheetah_h3_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'cheetah_sc_1682905510': 'scratch'},
+
+    #               {'hopper_h0_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 0', 
+    #               'hopper_h1_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 1', 
+    #               'hopper_h2_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 2', 
+    #               'hopper_h3_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'hopper_sc_1682909019': 'scratch'},
+    #               {'hopper_h0_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 0', 
+    #               'hopper_h1_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 1', 
+    #               'hopper_h2_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 2', 
+    #               'hopper_h3_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'hopper_sc_1682909019': 'scratch'},
+    #               {'hopper_h0_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 0', 
+    #               'hopper_h1_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 1', 
+    #               'hopper_h2_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 2', 
+    #               'hopper_h3_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'hopper_sc_1682909019': 'scratch'},
+
+    #               {'walker_h0_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 0', 
+    #               'walker_h1_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 1', 
+    #               'walker_h2_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 2', 
+    #               'walker_h3_ft_cheetah_sc_1682905510_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'walker_sc_1682910403': 'scratch'},
+    #               {'walker_h0_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 0', 
+    #               'walker_h1_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 1', 
+    #               'walker_h2_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 2', 
+    #               'walker_h3_ft_hopper_sc_1682909019_1600_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'walker_sc_1682910403': 'scratch'},
+    #               {'walker_h0_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 0', 
+    #               'walker_h1_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 1', 
+    #               'walker_h2_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 2', 
+    #               'walker_h3_ft_walker_sc_1682910403_1500_1683000901': 'finetune hidden layers: 3 (full model)', 
+    #               'walker_sc_1682910403': 'scratch'}
+    # ]
+    # titles =['cheetah_fine_tuned_on_cheetah', 
+    #          'cheetah_fine_tuned_on_hopper',
+    #          'cheetah_fine_tuned_on_walker',
+
+    #          'hopper_fine_tuned_on_cheetah', 
+    #          'hopper_fine_tuned_on_hopper',
+    #          'hopper_fine_tuned_on_walker',
+
+    #          'walker_fine_tuned_on_cheetah', 
+    #          'walker_fine_tuned_on_hopper',
+    #          'walker_fine_tuned_on_walker']
+
+    # for file_grp, title in zip(plot_files, titles):
+    #     plot(file_grp, title)
     pass
