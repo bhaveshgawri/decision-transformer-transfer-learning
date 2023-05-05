@@ -6,3 +6,4 @@ torch
 ipykernel
 pyvirtualdisplay
 imageio
+matplotlib
