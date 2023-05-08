@@ -1,3 +1,4 @@
+> some experiments with training and fine-tuning decision transformer
 
 #### Installation
 
@@ -10,4 +11,3 @@ python -m ipykernel install --user --name my_env --display-name "My Env"
 
 Higher versions (2.3.4 or above) of Mujoco are currently not working for Hopper/Walker2d:
 https://github.com/deepmind/mujoco/issues/833
-
