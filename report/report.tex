@@ -90,11 +90,11 @@ In this work, my contributions are four-fold:
     \item Implementation of a custom dataloader to normalize states and actions, calculate returns-to-go and attention masks, and return randomized batches of data for variable DT context lengths.
     \item Implementation of an evaluator class to test and evaluate the pre-trained and fine-tuned policies as well as calculate training statistics such as rewards throughout the training process.
     \item Evaluation and comparison between 36 fine-tuned and 3 trained-from-scratch policies in 3 different target environments.
-    \item (Proposed - novel but not implemented) Parameter efficient fine-tuning for DTs using Adapter\cite{houlsby2019parameter} modules. 
-            As this work got published very recently \cite{xu2023hyper}, 
-            I deferred my implementation for parameter efficient fine-tuning to future works 
-            and instead went ahead with full-model fine-tuning to focus on maximizing rewards 
-            while not conditioning it on parameter efficiency.
+    \item (Proposed - novel but not implemented) Parameter efficient fine-tuning for DTs using Adapter \cite{houlsby2019parameter} modules. 
+            As related work \cite{xu2023hyper} was published sometime after I started working on 
+            this project, I deferred my implementation for parameter efficient fine-tuning to 
+            future works and instead went ahead with full-model fine-tuning to focus on maximizing 
+            rewards while not conditioning it on parameter efficiency.
 \end{itemize}
 
 \section{Implementation Details}
